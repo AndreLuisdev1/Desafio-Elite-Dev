@@ -1,69 +1,116 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+import { Movie } from "@/types/movies";
+
+export default function CatalogPage() {
+  const [movies, setMovies] = useState<Movie[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+  useEffect(() => {
+    async function fetchCatalog() {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/catalog/movies?page=${page}`);
+        if (!res.ok) throw new Error("Erro ao buscar catálogo");
+        const data = await res.json();
+        setMovies(data);
+      } catch (error) {
+        console.error("Falha na requisição:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchCatalog();
+  }, [page, API_URL]);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="min-h-screen bg-slate-950 text-slate-100 p-8">
+      <header className="max-w-7xl mx-auto mb-8 flex justify-between items-center border-b border-slate-800 pb-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Catálogo TMDb</h1>
+          <p className="text-slate-400 text-sm mt-1">
+            Selecione um filme em cartaz para cadastrar como novo evento.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </header>
+
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <p className="text-slate-400 animate-pulse">Carregando filmes...</p>
         </div>
-      </main>
-    </div>
+      ) : (
+        <section className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {movies.map((movie) => (
+            <article
+              key={movie.tmdb_id}
+              className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg flex flex-col hover:border-slate-700 transition duration-200"
+            >
+              <div className="relative aspect-[2/3] w-full bg-slate-800">
+                {movie.poster_url ? (
+                  <img
+                    src={movie.poster_url}
+                    alt={movie.title}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-slate-500 text-sm">
+                    Sem pôster
+                  </div>
+                )}
+                <span className="absolute top-2 right-2 bg-slate-950/80 backdrop-blur-md px-2 py-1 rounded text-xs font-semibold text-amber-400 border border-slate-700">
+                  ★ {movie.vote_average ? movie.vote_average.toFixed(1) : "N/A"}
+                </span>
+              </div>
+
+              <div className="p-4 flex flex-col flex-1 justify-between">
+                <div>
+                  <h2 className="font-semibold text-base line-clamp-1" title={movie.title}>
+                    {movie.title}
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Lançamento: {movie.release_date || "Não informada"}
+                  </p>
+                  <p className="text-xs text-slate-300 mt-2 line-clamp-3">
+                    {movie.overview || "Sem sinopse disponível."}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="mt-4 w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs py-2.5 px-4 rounded-lg transition duration-150 cursor-pointer"
+                  onClick={() => alert(`Filme selecionado: ${movie.title}`)}
+                >
+                  Criar Evento
+                </button>
+              </div>
+            </article>
+          ))}
+        </section>
+      )}
+
+      {/* Paginação Simples */}
+      <footer className="max-w-7xl mx-auto mt-10 flex justify-center items-center gap-4">
+        <button
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          disabled={page === 1}
+          className="px-4 py-2 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Anterior
+        </button>
+        <span className="text-xs text-slate-400">Página {page}</span>
+        <button
+          onClick={() => setPage((p) => p + 1)}
+          className="px-4 py-2 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700"
+        >
+          Próxima
+        </button>
+      </footer>
+    </main>
   );
 }

@@ -1,0 +1,41 @@
+       ┌────────────────────────┐
+       │         USERS          │
+       ├────────────────────────┤
+       │ PK id                  │
+       │    name                │
+       │    email (UNIQUE)      │
+       │    password            │
+       │    role (ENUM)         │
+       │    created_at          │
+       └───────────┬────────────┘
+                   │
+         1:N       │        1:N
+   ┌───────────────┴───────────────┐
+   ▼                               ▼
+┌────────────────────────┐       ┌────────────────────────┐
+│         EVENTS         │       │        TICKETS         │
+├────────────────────────┤       ├────────────────────────┤
+│ PK id                  │       │ PK id                  │
+│    title               │ 1:N   │    ticket_code (UNIQUE)│
+│    description         │───────│    qr_code_hash (UNQ)  │
+│    date                │       │    status (ENUM)       │
+│    location            │       │ FK event_id            │
+│    price               │       │ FK user_id             │
+│    capacity            │       │ FK seat_id (UNIQUE)    │
+│    tmdb_id             │       │    created_at          │
+│    poster_url          │       │    used_at             │
+│ FK organizer_id        │       └───────────▲────────────┘
+└───────────┬────────────┘                   │
+            │                                │ 1:1
+        1:N │                                │
+            ▼                                │
+┌────────────────────────┐                   │
+│         SEATS          │                   │
+├────────────────────────┤                   │
+│ PK id                  │                   │
+│ FK event_id            │                   │
+│    seat_number         │                   │
+│    status (ENUM)       │                   │
+│ FK held_by_user_id     │───────────────────┘
+│    held_until          │
+└────────────────────────┘
