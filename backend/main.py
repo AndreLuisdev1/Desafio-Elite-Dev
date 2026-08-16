@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query
-from services.tmdb import now_playing_movies, search_movies
 from fastapi.middleware.cors import CORSMiddleware
-from db import init_db, close_db, fetch_one
+from db import close_db, fetch_one, init_db
+from routes.events import router as events_router
+from services.tmdb import now_playing_movies, search_movies
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -12,7 +13,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Desafio Elite Dev 2026 - API",
-    description="API para Plataforma de Eventos e Ingressos",
+    description="API para Plataforma de Eventos e Ingressos", 
     version="1.0.0",
     lifespan=lifespan
 )
@@ -48,9 +49,11 @@ async def health_check():
         }
 
 @app.get("/catalog/movies")
-async def catalog_movies(page: int = 1): #Definindo valor padrão para proteção da API caso o frontend não envie o parâmetro page
+async def catalog_movies(page: int = 1):
     return await now_playing_movies(page)
 
 @app.get("/catalog/search")
 async def catalog_search(query: str = Query(..., min_length=2)):
     return await search_movies(query)
+
+app.include_router(events_router)

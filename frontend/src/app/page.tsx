@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { Movie } from "@/types/movies";
+import CreateEventModal from "@/components/CreateEventModal";
 
 export default function CatalogPage() {
   const [movies, setMovies] = useState<Movie[]>([]);
+  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
 
@@ -84,7 +86,7 @@ export default function CatalogPage() {
                 <button
                   type="button"
                   className="mt-4 w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs py-2.5 px-4 rounded-lg transition duration-150 cursor-pointer"
-                  onClick={() => alert(`Filme selecionado: ${movie.title}`)}
+                  onClick={() => setSelectedMovie(movie)}
                 >
                   Criar Evento
                 </button>
@@ -111,6 +113,13 @@ export default function CatalogPage() {
           Próxima
         </button>
       </footer>
+
+      {/* Modal de Criação de Evento */}
+      <CreateEventModal
+        movie={selectedMovie}
+        isOpen={!!selectedMovie}
+        onClose={() => setSelectedMovie(null)}
+      />
     </main>
   );
 }
