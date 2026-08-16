@@ -40,3 +40,26 @@ class SeatResponse(BaseModel):
     event_id: int
     seat_number: str
     status: str  # 'AVAILABLE', 'HELD', 'OCCUPIED'
+
+
+class TicketCheckoutRequest(BaseModel):
+    event_id: int
+    seat_id: int
+    user_id: int
+
+class TicketValidateRequest(BaseModel):
+    ticket_code: str
+
+class TicketResponse(BaseModel):
+    id: int
+    event_id: int
+    seat_id: int
+    user_id: int
+    ticket_code: str
+    status: str  # 'VALID', 'USED', 'CANCELLED'
+    created_at: datetime
+    event_title: Optional[str] = None
+    event_date: Optional[datetime] = None
+    event_location: Optional[str] = None
+    seat_number: Optional[str] = None
+    user_name: Optional[str] = None
