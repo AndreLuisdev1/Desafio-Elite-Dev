@@ -28,3 +28,15 @@ class EventResponse(BaseModel):
     poster_url: Optional[str] = None
     organizer_id: int
     created_at: datetime
+
+# Validação dos campos para assentos
+class SeatHoldRequest(BaseModel):
+    seat_id: int
+    user_id: Optional[int] = None
+
+# Validação dos campos para resposta de assentos
+class SeatResponse(BaseModel):
+    id: int
+    event_id: int
+    seat_number: str
+    status: str  # 'AVAILABLE', 'HELD', 'OCCUPIED'
