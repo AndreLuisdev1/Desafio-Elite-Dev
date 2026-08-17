@@ -31,61 +31,64 @@ export default function CatalogPage() {
   }, [page, API_URL]);
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 p-8">
-      <header className="max-w-7xl mx-auto mb-8 flex justify-between items-center border-b border-slate-800 pb-4">
+    <main className="min-h-screen bg-[#f8f1e7] p-8 text-[#2f241d]">
+      <header className="mx-auto mb-8 flex max-w-7xl items-center justify-between border-b border-[#e8dcc8] pb-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Catálogo TMDb</h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#a86f4d]">Admin</p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-[#2f241d]">
+            Catálogo TMDb
+          </h1>
+          <p className="mt-1 text-sm text-[#4d3a30]">
             Selecione um filme em cartaz para cadastrar como novo evento.
           </p>
         </div>
       </header>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <p className="text-slate-400 animate-pulse">Carregando filmes...</p>
+        <div className="flex h-64 items-center justify-center">
+          <p className="animate-pulse text-[#7b4d35]">Carregando filmes...</p>
         </div>
       ) : (
-        <section className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        <section className="mx-auto grid max-w-7xl grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {movies.map((movie) => (
             <article
               key={movie.tmdb_id}
-              className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg flex flex-col hover:border-slate-700 transition duration-200"
+              className="flex flex-col overflow-hidden rounded-xl border border-[#e8dcc8] bg-[#fffaf3] shadow-sm transition hover:border-[#a86f4d]"
             >
-              <div className="relative aspect-[2/3] w-full bg-slate-800">
+              <div className="relative aspect-[2/3] w-full bg-[#f3e1d4]">
                 {movie.poster_url ? (
                   <img
                     src={movie.poster_url}
                     alt={movie.title}
-                    className="w-full h-full object-cover"
+                    className="h-full w-full object-cover"
                     loading="lazy"
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-slate-500 text-sm">
+                  <div className="flex h-full items-center justify-center text-sm text-[#7b4d35]">
                     Sem pôster
                   </div>
                 )}
-                <span className="absolute top-2 right-2 bg-slate-950/80 backdrop-blur-md px-2 py-1 rounded text-xs font-semibold text-amber-400 border border-slate-700">
+                <span className="absolute right-2 top-2 rounded text-xs font-semibold border border-[#d7c1a5] bg-[#2f241d]/85 px-2 py-1 text-[#f8f1e7]">
                   ★ {movie.vote_average ? movie.vote_average.toFixed(1) : "N/A"}
                 </span>
               </div>
 
-              <div className="p-4 flex flex-col flex-1 justify-between">
+              <div className="flex flex-1 flex-col justify-between p-4">
                 <div>
-                  <h2 className="font-semibold text-base line-clamp-1" title={movie.title}>
+                  <h2 className="line-clamp-1 text-base font-semibold text-[#2f241d]" title={movie.title}>
                     {movie.title}
                   </h2>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="mt-1 text-xs text-[#4d3a30]">
                     Lançamento: {movie.release_date || "Não informada"}
                   </p>
-                  <p className="text-xs text-slate-300 mt-2 line-clamp-3">
+                  <p className="mt-2 line-clamp-3 text-xs text-[#5e4a3f]">
                     {movie.overview || "Sem sinopse disponível."}
                   </p>
                 </div>
 
                 <button
                   type="button"
-                  className="mt-4 w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs py-2.5 px-4 rounded-lg transition duration-150 cursor-pointer"
+                  className="mt-4 w-full cursor-pointer rounded-lg bg-[#7b4d35] px-4 py-2.5 text-xs font-medium text-[#fffaf3] transition hover:bg-[#a86f4d]"
                   onClick={() => setSelectedMovie(movie)}
                 >
                   Criar Evento
@@ -96,25 +99,23 @@ export default function CatalogPage() {
         </section>
       )}
 
-      {/* Paginação Simples */}
-      <footer className="max-w-7xl mx-auto mt-10 flex justify-center items-center gap-4">
+      <footer className="mx-auto mt-10 flex max-w-7xl items-center justify-center gap-4">
         <button
           onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page === 1}
-          className="px-4 py-2 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="rounded bg-[#fffaf3] px-4 py-2 text-xs font-semibold text-[#7b4d35] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Anterior
         </button>
-        <span className="text-xs text-slate-400">Página {page}</span>
+        <span className="text-xs text-[#4d3a30]">Página {page}</span>
         <button
           onClick={() => setPage((p) => p + 1)}
-          className="px-4 py-2 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700"
+          className="rounded bg-[#fffaf3] px-4 py-2 text-xs font-semibold text-[#7b4d35]"
         >
           Próxima
         </button>
       </footer>
 
-      {/* Modal de Criação de Evento */}
       <CreateEventModal
         movie={selectedMovie}
         isOpen={!!selectedMovie}
