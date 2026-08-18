@@ -1,13 +1,21 @@
 from typing import List
-from fastapi import APIRouter, HTTPException, status
 from db import execute_query, fetch_all, fetch_one
+from dependencies import require_role
+from fastapi import APIRouter, Depends, HTTPException, status
 from schemas import EventCreate, EventResponse
 
-router = APIRouter(tags=["events"])
+router = APIRouter(prefix="/events", tags=["events"])
 
-# Endpoint para criar um evento - ORGANIZADOR
-@router.post("/events", status_code=status.HTTP_201_CREATED)
-async def create_event(event: EventCreate):
+
+# 1. Criar um evento e gerar o mapa de assentos - ORGANIZADOR
+@router.post("/", status_code=status.HTTP_201_CREATED)
+async def create_event(
+    event: EventCreate,
+    current_user: dict = Depends(require_role(["ORGANIZER"])),
+):
+    # O ID do organizador vem diretamente do token validado
+    organizer_id = current_user["id"]
+
     query = """
         INSERT INTO events (title, description, date, location, price, capacity, tmdb_id, poster_url, organizer_id)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -21,12 +29,13 @@ async def create_event(event: EventCreate):
         event.capacity,
         event.tmdb_id,
         event.poster_url,
-        event.organizer_id,
+        organizer_id,
     )
 
     try:
         event_id = await execute_query(query, params)
 
+        # Geração automática da grade de assentos (Linhas A até E)
         rows = ["A", "B", "C", "D", "E"]
         seats_per_row = max(1, event.capacity // len(rows))
 
@@ -50,8 +59,10 @@ async def create_event(event: EventCreate):
         )
 
 
-# Endpoint para listar todos os eventos - CLIENTE
-@router.get("/events", response_model=List[EventResponse], status_code=status.HTTP_200_OK)
+# 2. Listar todos os eventos - PÚBLICO / CLIENTE
+@router.get(
+    "/", response_model=List[EventResponse], status_code=status.HTTP_200_OK
+)
 async def list_events():
     query = """
         SELECT e.id, e.title, e.description, e.date, e.location, e.price, e.capacity, 
@@ -70,8 +81,10 @@ async def list_events():
         )
 
 
-# Endpoint para obter detalhes de um evento específico - CLIENTE
-@router.get("/events/{event_id}", response_model=EventResponse, status_code=status.HTTP_200_OK)
+# 3. Obter detalhes de um evento específico - PÚBLICO / CLIENTE
+@router.get(
+    "/{event_id}", response_model=EventResponse, status_code=status.HTTP_200_OK
+)
 async def get_event(event_id: int):
     query = """
         SELECT e.id, e.title, e.description, e.date, e.location, e.price, e.capacity, 

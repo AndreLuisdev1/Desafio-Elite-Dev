@@ -1,8 +1,50 @@
-from pydantic import BaseModel, Field
 from datetime import datetime
+from enum import Enum
 from typing import Optional
+from pydantic import BaseModel, EmailStr, Field
 
-# Validação dos campos para criação de eventos
+
+# -------------------------------------------------------------
+# 1. Autenticação & Usuários (RBAC)
+# -------------------------------------------------------------
+class UserRole(str, Enum):
+    CLIENT = "CLIENT"
+    ORGANIZER = "ORGANIZER"
+    GATEKEEPER = "GATEKEEPER"
+
+
+class UserRegisterRequest(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+    role: UserRole = UserRole.CLIENT
+
+
+class UserLoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_id: int
+    name: str
+    email: str
+    role: str
+
+
+class UserProfileResponse(BaseModel):
+    id: int
+    name: str
+    email: str
+    role: str
+    created_at: Optional[datetime] = None
+
+
+# -------------------------------------------------------------
+# 2. Eventos & Sessões
+# -------------------------------------------------------------
 class EventCreate(BaseModel):
     title: str
     description: Optional[str] = None
@@ -12,10 +54,11 @@ class EventCreate(BaseModel):
     capacity: int = Field(gt=0)
     tmdb_id: Optional[int] = None
     poster_url: Optional[str] = None
-    organizer_id: int = Field
+    organizer_id: Optional[int] = (
+        None  # Preenchido automaticamente via token JWT
+    )
 
 
-# Validação dos campos para eventos criados
 class EventResponse(BaseModel):
     id: int
     title: str
@@ -26,34 +69,43 @@ class EventResponse(BaseModel):
     capacity: int
     tmdb_id: Optional[int] = None
     poster_url: Optional[str] = None
+    organizer_name: Optional[str] = None
     organizer_id: int
     created_at: datetime
 
-# Validação dos campos para assentos
+
+# -------------------------------------------------------------
+# 3. Mapa de Assentos
+# -------------------------------------------------------------
 class SeatHoldRequest(BaseModel):
     seat_id: int
     user_id: Optional[int] = None
 
-# Validação dos campos para resposta de assentos
+
 class SeatResponse(BaseModel):
     id: int
     event_id: int
     seat_number: str
-    status: str  # 'AVAILABLE', 'HELD', 'OCCUPIED'
+    status: str  # 'AVAILABLE', 'HELD', 'SOLD'
 
 
+# -------------------------------------------------------------
+# 4. Ingressos & Validação (Tickets & Check-in)
+# -------------------------------------------------------------
 class TicketCheckoutRequest(BaseModel):
     event_id: int
     seat_id: int
-    user_id: int
+    user_id: Optional[int] = None  # Preenchido via token JWT
+
 
 class TicketValidateRequest(BaseModel):
     ticket_code: str
 
+
 class TicketResponse(BaseModel):
     id: int
     event_id: int
-    seat_id: int
+    seat_id: Optional[int] = None
     user_id: int
     ticket_code: str
     status: str  # 'VALID', 'USED', 'CANCELLED'

@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from db import close_db, fetch_one, init_db
+from routes.auth import router as auth_router
 from routes.events import router as events_router
 from routes.seats import router as seats_router
 from routes.tickets import router as tickets_router
@@ -59,6 +60,7 @@ async def catalog_movies(page: int = 1):
 async def catalog_search(query: str = Query(..., min_length=2)):
     return await search_movies(query)
 
+app.include_router(auth_router)
 app.include_router(events_router)
 app.include_router(seats_router)
 app.include_router(tickets_router)
