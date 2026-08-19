@@ -1,5 +1,76 @@
 @import "tailwindcss";
 
+:root {
+  --bg: #f7f0e7;
+  --bg-strong: #f0e5d6;
+  --panel: #fffaf4;
+  --panel-strong: #f3e7d8;
+  --primary: #b88d67;
+  --primary-strong: #8c6548;
+  --text: #2d241f;
+  --muted: #685b52;
+  --border: rgba(106, 80, 61, 0.18);
+  --shadow: rgba(90, 71, 58, 0.12);
+  --success: #6c8d70;
+  --warning: #d5a86a;
+  --danger: #b86c5d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
 body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #fffaf5 0%, var(--bg) 42%, var(--bg-strong) 100%);
+  color: var(--text);
   font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.5;
+}
+
+body,
+input,
+button,
+textarea,
+select {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+}
+
+button {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+main {
+  width: min(1200px, calc(100% - 32px));
+  margin: 0 auto;
 }

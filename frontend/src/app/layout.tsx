@@ -1,21 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/NavbarComponent";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { AuthProvider } from "@/contexts/AuthContext";
+import NavBar from "@/components/navBar";
 
 export const metadata: Metadata = {
-  title: "CineEventos | Ingressos e Sessões",
-  description: "Plataforma para compra e gestão de ingressos de cinema com QR Code.",
+  title: "Elite | Cinema & Eventos",
+  description: "Sistema de ingressos e eventos em uma paleta elegante em creme",
 };
 
 export default function RootLayout({
@@ -24,13 +14,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="pt-BR"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col bg-[#f8f1e7] text-[#2f241d]">
-        <Navbar />
-        <div className="flex-1">{children}</div>
+    <html lang="pt-BR">
+      <body className="bg-[#F9F6F0] text-stone-900 antialiased min-h-screen flex flex-col">
+        <AuthProvider>
+          <NavBar />
+          <div className="flex-1">{children}</div>
+        </AuthProvider>
       </body>
     </html>
   );
