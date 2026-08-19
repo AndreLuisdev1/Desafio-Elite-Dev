@@ -34,7 +34,7 @@ async def register(payload: UserRegisterRequest):
     )
 
     access_token = create_access_token(
-        data={"sub": user_id, "email": payload.email, "role": payload.role.value}
+        data={"sub": str(user_id), "email": payload.email, "role": payload.role.value}
     )
 
     return {
@@ -61,7 +61,7 @@ async def login(payload: UserLoginRequest):
         )
 
     access_token = create_access_token(
-        data={"sub": user["id"], "email": user["email"], "role": user["role"]}
+        data={"sub": str(user["id"]), "email": user["email"], "role": user["role"]}
     )
 
     return {

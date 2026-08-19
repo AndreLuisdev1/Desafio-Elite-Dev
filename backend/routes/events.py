@@ -8,7 +8,7 @@ router = APIRouter(prefix="/events", tags=["events"])
 
 
 # 1. Criar um evento e gerar o mapa de assentos - ORGANIZADOR
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
 async def create_event(
     event: EventCreate,
     current_user: dict = Depends(require_role(["ORGANIZER"])),
@@ -37,10 +37,11 @@ async def create_event(
 
         # Geração automática da grade de assentos (Linhas A até E)
         rows = ["A", "B", "C", "D", "E"]
-        seats_per_row = max(1, event.capacity // len(rows))
+        seats_per_row, extra_seats = divmod(event.capacity, len(rows))
 
-        for row in rows:
-            for number in range(1, seats_per_row + 1):
+        for row_index, row in enumerate(rows):
+            row_capacity = seats_per_row + (1 if row_index < extra_seats else 0)
+            for number in range(1, row_capacity + 1):
                 seat_query = """
                     INSERT INTO seats (event_id, seat_number, status) 
                     VALUES (%s, %s, 'AVAILABLE')
@@ -60,9 +61,7 @@ async def create_event(
 
 
 # 2. Listar todos os eventos - PÚBLICO / CLIENTE
-@router.get(
-    "/", response_model=List[EventResponse], status_code=status.HTTP_200_OK
-)
+@router.get("", response_model=List[EventResponse], status_code=status.HTTP_200_OK)
 async def list_events():
     query = """
         SELECT e.id, e.title, e.description, e.date, e.location, e.price, e.capacity, 

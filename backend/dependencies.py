@@ -20,7 +20,15 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user_id = payload.get("sub")
+    try:
+        user_id = int(payload["sub"])
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido: identificador de usuário ausente",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     query = "SELECT id, name, email, role FROM users WHERE id = %s"
     user = await fetch_one(query, (user_id,))
 
