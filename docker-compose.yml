@@ -12,6 +12,47 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./backend/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "devuser", "-pdevpassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+    container_name: elite_dev_backend
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: devuser
+      DB_PASSWORD: devpassword
+      DB_NAME: elitedev_db
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-secret-in-production}
+      TMDB_API_KEY: ${TMDB_API_KEY:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+        NEXT_PUBLIC_TMDB_API_KEY: ${NEXT_PUBLIC_TMDB_API_KEY:-}
+    container_name: elite_dev_frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_TMDB_API_KEY: ${NEXT_PUBLIC_TMDB_API_KEY:-}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
 
 volumes:
   mysql_data:
