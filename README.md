@@ -149,7 +149,35 @@ O pagamento e propositalmente simulado: cartao terminado em `0000` representa um
 
 ## Decisoes de projeto e uso de IA
 
-Este projeto utilizou IA como apoio para exploracao do repositorio, diagnostico de erros, implementacao incremental e revisao de configuracao. As decisoes de escopo, escolha do fluxo de assentos, organizacao visual e priorizacao dos requisitos devem ser registradas aqui pelo autor, junto com os artefatos de analise produzidos durante o desenvolvimento.
+### Decisoes de projeto
+
+- A stack escolhida foi React/Next.js no frontend, Python/FastAPI no backend, MySQL 8 no banco e Docker para a execucao local.
+- O Prisma foi removido por ser uma ferramenta com a qual eu tinha pouca familiaridade. Optei por `aiomysql` com pool de conexoes e helpers reutilizaveis no arquivo `db.py`.
+- A API foi organizada em rotas separadas para autenticacao, eventos, assentos e ingressos, mantendo o `main.py` responsavel pela inicializacao, lifespan e CORS.
+- O banco foi modelado no `schema.sql` e executado inicialmente pelo DBeaver. A geracao de assentos usa cinco fileiras, com limite de 50 lugares por sessao para preservar a experiencia visual.
+- O fluxo foi construido incrementalmente: catalogo TMDb, criacao de eventos, selecao e reserva temporaria de assentos, compra simulada, carteira de ingressos e portaria.
+
+### Uso de IA
+
+Utilizei Gemini, Claude e GitHub Copilot como apoio durante a exploracao, implementacao e revisao do projeto. A IA foi usada para:
+
+- auxiliar na modelagem inicial do banco e na criacao de partes das rotas, schemas e componentes do frontend;
+- sugerir a configuracao do Docker Compose, do pool assincro de conexoes, do CORS e da integracao com o TMDb usando `httpx`;
+- organizar telas, tipagens, estados de carregamento, mensagens de erro e padronizacao visual do frontend;
+- investigar o erro de token invalido causado pela exigencia do PyJWT de usar `sub` como string;
+- diagnosticar o erro de autenticacao do TMDb e a diferenca entre as configuracoes locais e do Docker;
+- auxiliar na implementacao da paginacao do catalogo, reserva temporaria, compartilhamento por link, leitura de QR Code pela camera, seed de avaliacao e pagamento simulado.
+
+As decisoes de produto, escopo, escolha das tecnologias, remocao do Prisma, limite de capacidade, organizacao das telas e validacao dos fluxos foram feitas por mim. Todo codigo sugerido por IA foi revisado, adaptado e testado localmente com Docker, incluindo validacoes de sintaxe, build do frontend, testes manuais da API e execucao do seed.
+
+### Referencias consultadas
+
+- [MySQL com Docker Compose](https://www.slingacademy.com/article/use-mysql-with-docker-and-docker-compose/)
+- [CORS no FastAPI](https://fastapi.tiangolo.com/tutorial/cors/#use-corsmiddleware)
+- [Pool de conexoes do aiomysql](https://aiomysql.readthedocs.io/en/stable/pool.html)
+- [Cliente assincrono httpx](https://www.python-httpx.org/async/)
+- [Documentacao oficial da API do TMDb](https://developer.themoviedb.org/reference/intro/getting-started)
+- [Autenticacao de usuarios no FastAPI](https://medium.com/@wangarraakoth/user-authentication-in-fastapi-using-python-3b51af11b38d)
 
 ## Licenca
 
