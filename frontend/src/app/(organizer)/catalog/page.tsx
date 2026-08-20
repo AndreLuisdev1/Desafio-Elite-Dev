@@ -15,6 +15,8 @@ export default function CatalogPage() {
   const [movies, setMovies] = useState<MovieTMDb[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const [selectedMovie, setSelectedMovie] = useState<MovieTMDb | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -56,16 +58,18 @@ export default function CatalogPage() {
   };
 
   // 1. Carrega filmes em cartaz via GET /catalog/movies
-  const loadNowPlaying = useCallback(async () => {
+  const loadNowPlaying = useCallback(async (page = 1) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_URL}/catalog/movies`);
+      const res = await fetch(`${API_URL}/catalog/movies?page=${page}`);
       if (!res.ok) {
         throw new Error(getErrorMessage(await res.text(), "Erro ao carregar catálogo."));
       }
       const data = await res.json();
       setMovies(normalizeMovies(data));
+      setCurrentPage(data?.page || page);
+      setTotalPages(data?.total_pages || 1);
     } catch (err: any) {
       setError(err.message || "Falha ao conectar com o backend.");
     } finally {
@@ -87,6 +91,12 @@ export default function CatalogPage() {
   function handleEventCreated() {
     setSuccessMessage("Evento criado com sucesso. Os assentos já foram gerados!");
     setTimeout(() => setSuccessMessage(null), 5000);
+  }
+
+  function handlePageChange(page: number) {
+    if (page < 1 || page > totalPages || page === currentPage || loading) return;
+    loadNowPlaying(page);
+    document.getElementById("catalogo-filmes")?.scrollIntoView({ behavior: "smooth" });
   }
 
   if (authLoading || (!user && !authLoading)) {
@@ -153,7 +163,7 @@ export default function CatalogPage() {
             <span><span aria-hidden="true">!</span> {error}</span>
             <button
               type="button"
-              onClick={loadNowPlaying}
+              onClick={() => loadNowPlaying(currentPage)}
               className="w-fit font-bold text-rose-200 underline underline-offset-2 hover:text-white"
             >
               Tentar novamente
@@ -237,6 +247,30 @@ export default function CatalogPage() {
             </article>
           ))}
         </div>
+      )}
+
+      {!loading && movies.length > 0 && totalPages > 1 && (
+        <nav className="mt-8 flex items-center justify-center gap-4" aria-label="Paginação do catálogo">
+          <button
+            type="button"
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="rounded-xl border border-[#D9CCBB] bg-[#FAF7F2] px-4 py-2.5 text-xs font-bold text-stone-700 transition hover:border-amber-400 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            ← Anterior
+          </button>
+          <span className="min-w-24 text-center text-xs font-bold text-stone-600">
+            Página {currentPage} de {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="rounded-xl bg-stone-900 px-4 py-2.5 text-xs font-bold text-stone-50 transition hover:bg-amber-900 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Próxima →
+          </button>
+        </nav>
       )}
 
       <CreateEventModal

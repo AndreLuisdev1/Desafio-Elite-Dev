@@ -36,7 +36,11 @@ async def now_playing_movies(page: int = 1):
                 "poster_url": f"{IMAGE_BASE_URL}{poster_path}" if poster_path else None
             })
             
-        return movies
+        return {
+            "results": movies,
+            "page": data.get("page", page),
+            "total_pages": data.get("total_pages", page),
+        }
 
 async def search_movies(query: str):
     """Busca filmes por título"""
