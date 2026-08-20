@@ -122,7 +122,28 @@ async def list_my_tickets(
         )
 
 
-# 3. Buscar Ingresso Específico por ID
+ # 3. Visualização pública e limitada para compartilhamento do ingresso
+@router.get("/share/{ticket_code}")
+async def share_ticket(ticket_code: str):
+    ticket = await fetch_one(
+        """
+        SELECT t.ticket_code, t.status, e.title AS event_title, e.date AS event_date,
+               e.location AS event_location, s.seat_number
+        FROM tickets t
+        JOIN events e ON t.event_id = e.id
+        LEFT JOIN seats s ON t.seat_id = s.id
+        WHERE t.ticket_code = %s
+        """,
+        (ticket_code,),
+    )
+
+    if not ticket:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingresso não encontrado")
+
+    return ticket
+
+
+# 4. Buscar Ingresso Específico por ID
 @router.get("/{ticket_id}", response_model=TicketResponse, status_code=status.HTTP_200_OK)
 async def get_ticket(ticket_id: int, current_user: dict = Depends(get_current_user)):
     query = """
@@ -157,7 +178,7 @@ async def get_ticket(ticket_id: int, current_user: dict = Depends(get_current_us
     return ticket
 
 
-# 4. Validar Ingresso na Portaria (Check-in via QR Code)
+# 5. Validar Ingresso na Portaria (Check-in via QR Code)
 @router.post("/validate")
 async def validate_ticket(
     payload: TicketValidateRequest,

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { Html5Qrcode } from "html5-qrcode";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -20,6 +21,37 @@ export default function ScannerPage() {
   const [result, setResult] = useState<ValidationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [scannerActive, setScannerActive] = useState(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+
+  useEffect(() => {
+    if (!scannerActive) return;
+
+    const scanner = new Html5Qrcode("qr-reader");
+    scannerRef.current = scanner;
+
+    scanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      (decodedText) => {
+        setCode(decodedText);
+        setScannerActive(false);
+        setError(null);
+      },
+      () => undefined,
+    ).catch(() => {
+      setError("Não foi possível acessar a câmera. Verifique a permissão ou digite o código manualmente.");
+      setScannerActive(false);
+    });
+
+    return () => {
+      if (scanner.isScanning) {
+        void scanner.stop().catch(() => undefined);
+      }
+      scanner.clear();
+      scannerRef.current = null;
+    };
+  }, [scannerActive]);
 
   async function validateTicket(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -101,6 +133,26 @@ export default function ScannerPage() {
                 className="min-w-0 flex-1 bg-white border border-[#D5CBB9] rounded-xl px-4 py-3 text-sm font-mono uppercase placeholder:normal-case placeholder:font-sans placeholder:text-stone-400 focus:outline-none focus:border-amber-900 focus:ring-1 focus:ring-amber-900 transition"
               />
             </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setError(null); setScannerActive(true); }}
+                disabled={scannerActive}
+                className="flex-1 rounded-xl border border-amber-300 bg-amber-50 py-3 text-xs font-bold text-amber-950 transition hover:bg-amber-100 disabled:opacity-50"
+              >
+                {scannerActive ? "Câmera ativa..." : "Ler QR pela câmera"}
+              </button>
+              {scannerActive && (
+                <button
+                  type="button"
+                  onClick={() => setScannerActive(false)}
+                  className="rounded-xl border border-[#D5CBB9] bg-white px-4 py-3 text-xs font-bold text-stone-700 hover:bg-stone-100"
+                >
+                  Fechar
+                </button>
+              )}
+            </div>
+            {scannerActive && <div id="qr-reader" className="mt-4 overflow-hidden rounded-2xl border border-[#D5CBB9] bg-stone-950" />}
             <button
               type="submit"
               disabled={loading}

@@ -61,6 +61,20 @@ export default function MyTicketsPage() {
     });
   }
 
+  async function shareTicket(ticketCode: string) {
+    const shareUrl = `${window.location.origin}/share/${encodeURIComponent(ticketCode)}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Meu ingresso", url: shareUrl });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        window.alert("Link do ingresso copiado.");
+      }
+    } catch {
+      // Cancelar o compartilhamento nativo não deve exibir erro.
+    }
+  }
+
   if (authLoading || loading) {
     return (
       <div className="min-h-[calc(100vh-70px)] flex items-center justify-center text-xs text-stone-500">
@@ -154,6 +168,13 @@ export default function MyTicketsPage() {
                   <span className="text-[10px] font-mono font-semibold text-stone-500 mt-2">
                     {ticket.ticket_code}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => shareTicket(ticket.ticket_code)}
+                    className="mt-3 rounded-lg bg-stone-900 px-3 py-2 text-[10px] font-bold text-white transition hover:bg-amber-900"
+                  >
+                    Compartilhar ingresso
+                  </button>
                 </div>
               </article>
             );

@@ -4,7 +4,7 @@ Plataforma de sessoes de cinema com tres perfis de acesso:
 
 - **Cliente**: consulta sessoes, escolhe um assento, realiza o checkout simulado e consulta seus ingressos.
 - **Organizador**: importa filmes do TMDb e publica sessoes com data, local, preco, capacidade e mapa de assentos.
-- **Portaria**: responsavel por validar ingressos na entrada. A interface de scanner ainda esta em desenvolvimento.
+- **Portaria**: responsavel por validar ingressos na entrada por codigo digitado ou leitura de QR Code pela camera.
 
 ## Tecnologias
 
@@ -85,7 +85,7 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-Configure o arquivo `backend/.env` com o acesso ao MySQL e a chave do TMDb.
+Configure o arquivo `.env` na raiz do projeto com o acesso ao MySQL, a chave do TMDb e o segredo JWT.
 
 ### Frontend
 
@@ -109,21 +109,43 @@ NEXT_PUBLIC_TMDB_API_KEY=sua-chave-tmdb
 3. Saia e cadastre um usuario com perfil `CLIENT`.
 4. Na vitrine, abra a sessao, escolha uma poltrona e finalize o checkout.
 5. Acesse **Meus ingressos** para visualizar o codigo e o QR Code.
-6. A validacao pela portaria possui endpoint no backend, mas a tela de leitura ainda precisa ser finalizada.
+6. Na portaria, valide o ingresso digitando o codigo ou lendo o QR Code pela camera.
 
-## Estado atual e proximos passos
+Para criar dados iniciais de avaliacao depois que os containers estiverem ativos:
 
-O projeto ja possui autenticacao com tres papeis, catalogo TMDb, criacao de sessoes, geracao de assentos, vitrine, selecao de poltrona, checkout basico e carteira de ingressos.
+```powershell
+docker compose exec backend python seed.py
+```
 
-Ainda faltam para fechar o escopo completo do desafio:
+O seed cria usuarios de demonstracao, uma sessao no Cinemark de Sao Jose dos Campos, 50 assentos e um ingresso valido.
 
-- tela de portaria com leitura de QR pela camera e digitacao manual;
-- pagamento simulado com cenarios de aprovacao e recusa;
-- reserva temporaria com proprietario e expiracao;
-- protecao transacional contra compra concorrente do mesmo assento;
-- compartilhamento de ingresso por link;
-- dados semeados para avaliacao;
-- testes automatizados dos fluxos criticos.
+Credenciais de demonstracao:
+
+- Organizador: `organizer.demo@example.com` / `Demo@123456`
+- Cliente: `client.demo@example.com` / `Demo@123456`
+- Portaria: `gatekeeper.demo@example.com` / `Demo@123456`
+- Ingresso: `TKT-DEMO2026`
+
+## Estado atual
+
+O projeto possui autenticacao com tres papeis, catalogo TMDb paginado, criacao e edicao de sessoes, sala padrao no Cinemark de Sao Jose dos Campos, limite de 50 assentos, bloqueio temporario de lugares, vitrine, compra simulada, carteira de ingressos, compartilhamento por link, QR Code para entrada e leitura por camera na portaria.
+
+O pagamento e propositalmente simulado: cartao terminado em `0000` representa uma recusa; PIX exibe um QR Code ficticio e um codigo copia-e-cola sem cobranca real.
+
+## Historico de desenvolvimento
+
+- Escolha de React/Next.js, FastAPI, MySQL 8, Docker, DBeaver, Git e GitHub.
+- Criacao da estrutura Docker, `.gitignore` e modelagem inicial em `schema.sql`.
+- Remocao do Prisma por menor familiaridade com a ferramenta.
+- Implementacao do pool assincro de conexoes com `aiomysql` e helpers de banco.
+- Integracao assincrona com o TMDb usando `httpx`, incluindo catalogo paginado.
+- Criacao das rotas de autenticacao, eventos, assentos e ingressos com papeis CLIENT, ORGANIZER e GATEKEEPER.
+- Construcao gradual das telas Next.js, com catalogo, vitrine, selecao de assentos, carteira, organizacao de eventos e portaria.
+- Correcao do problema de decodificacao do JWT causado pelo tipo do campo `sub`.
+- Implementacao da reserva temporaria com expiracao e liberacao automatica de assentos vencidos.
+- Adicao de valores padrao, limite de 50 assentos e bloqueio de datas passadas.
+- Implementacao do checkout simulado, recusa controlada de cartao e PIX ficticio.
+- Adicao de compartilhamento de ingresso por link, seed de avaliacao e leitura de QR Code pela camera.
 
 ## Decisoes de projeto e uso de IA
 
