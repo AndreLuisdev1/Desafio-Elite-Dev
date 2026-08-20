@@ -130,7 +130,7 @@ export default function CatalogPage() {
               onClick={() => router.push("/catalog/events")}
               className="rounded-xl border border-stone-700 bg-stone-900 px-4 py-3 text-xs font-semibold text-stone-200 transition hover:border-stone-500 hover:bg-stone-800"
             >
-              Criar manualmente
+              Meus eventos
             </button>
           </div>
         </div>

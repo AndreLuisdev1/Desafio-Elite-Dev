@@ -59,6 +59,15 @@ class EventCreate(BaseModel):
     )
 
 
+class EventUpdate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    date: datetime
+    location: str
+    price: float = Field(gt=0)
+    poster_url: Optional[str] = None
+
+
 class EventResponse(BaseModel):
     id: int
     title: str
@@ -79,7 +88,6 @@ class EventResponse(BaseModel):
 # -------------------------------------------------------------
 class SeatHoldRequest(BaseModel):
     seat_id: int
-    user_id: Optional[int] = None
 
 
 class SeatResponse(BaseModel):

@@ -13,12 +13,22 @@ router = APIRouter(prefix="/tickets", tags=["tickets"])
 @router.post("/checkout", status_code=status.HTTP_201_CREATED)
 async def checkout_ticket(
     payload: TicketCheckoutRequest,
-    current_user: dict = Depends(require_role(["CLIENT", "ORGANIZER"])),
+    current_user: dict = Depends(require_role(["CLIENT"])),
 ):
     buyer_id = current_user["id"]
 
     # 1. Verifica se o assento existe e pertence à sessão
-    seat_query = "SELECT id, status FROM seats WHERE id = %s AND event_id = %s"
+    await execute_query(
+        """
+        UPDATE seats SET status = 'AVAILABLE', held_by_user_id = NULL, held_until = NULL
+        WHERE id = %s AND status = 'HELD' AND (held_until IS NULL OR held_until <= NOW())
+        """,
+        (payload.seat_id,),
+    )
+    seat_query = """
+        SELECT id, status, held_by_user_id
+        FROM seats WHERE id = %s AND event_id = %s
+    """
     seat = await fetch_one(seat_query, (payload.seat_id, payload.event_id))
 
     if not seat:
@@ -27,19 +37,25 @@ async def checkout_ticket(
             detail="Assento não encontrado para este evento",
         )
 
-    # Verifica se já foi comprado (SOLD)
     if seat["status"] == "SOLD":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Este assento já foi comprado por outro usuário",
         )
 
+    if seat["status"] != "HELD" or seat["held_by_user_id"] != buyer_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Selecione e reserve este assento antes de finalizar a compra",
+        )
+
     try:
         # 2. Bloqueia o assento em definitivo
         update_seat_query = (
-            "UPDATE seats SET status = 'SOLD', held_by_user_id = NULL WHERE id = %s"
+            "UPDATE seats SET status = 'SOLD', held_by_user_id = NULL, held_until = NULL "
+            "WHERE id = %s AND status = 'HELD' AND held_by_user_id = %s"
         )
-        await execute_query(update_seat_query, (payload.seat_id,))
+        await execute_query(update_seat_query, (payload.seat_id, buyer_id))
 
         # 3. Gera identificador e hash criptográfico do QR Code
         ticket_code = f"TKT-{uuid.uuid4().hex[:10].upper()}"

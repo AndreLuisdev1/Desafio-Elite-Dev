@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { EventItem, Seat } from "@/types";
@@ -15,6 +15,7 @@ export default function EventDetailPage() {
   const [event, setEvent] = useState<EventItem | null>(null);
   const [seats, setSeats] = useState<Seat[]>([]);
   const [selectedSeat, setSelectedSeat] = useState<Seat | null>(null);
+  const selectedSeatRef = useRef<number | null>(null);
 
   const [loadingEvent, setLoadingEvent] = useState(true);
   const [loadingSeats, setLoadingSeats] = useState(true);
@@ -57,33 +58,77 @@ export default function EventDetailPage() {
     }
   }, [id, fetchEvent, fetchSeats]);
 
+  // Libera o bloqueio quando o cliente abandona a tela sem concluir a compra.
+  useEffect(() => {
+    return () => {
+      const seatId = selectedSeatRef.current;
+      if (seatId && token) {
+        void fetch(`${API_URL}/seats/release`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ seat_id: seatId }),
+          keepalive: true,
+        });
+      }
+    };
+  }, [token]);
+
   // Ação ao clicar no assento
   async function handleSelectSeat(seat: Seat) {
     if (seat.status === "SOLD") return;
 
+    if (!user || !token) {
+      router.push("/login");
+      return;
+    }
+
     setError(null);
+
+    async function releaseSeat(seatId: number) {
+      const response = await fetch(`${API_URL}/seats/release`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ seat_id: seatId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Não foi possível liberar o assento anterior.");
+      }
+    }
 
     // Se clicar no mesmo assento, desmarca e libera
     if (selectedSeat?.id === seat.id) {
       try {
-        await fetch(`${API_URL}/seats/release`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ seat_id: seat.id }),
-        });
-      } catch (e) {
-        console.error("Erro ao liberar assento:", e);
+        await releaseSeat(seat.id);
+        selectedSeatRef.current = null;
+        setSelectedSeat(null);
+        await fetchSeats();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Não foi possível liberar o assento.");
       }
-      setSelectedSeat(null);
-      fetchSeats();
       return;
     }
 
     // Tenta reservar temporariamente o assento selecionado
     try {
+      if (selectedSeat) {
+        await releaseSeat(selectedSeat.id);
+        selectedSeatRef.current = null;
+        setSelectedSeat(null);
+      }
+
       const res = await fetch(`${API_URL}/seats/hold`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ seat_id: seat.id }),
       });
 
@@ -92,10 +137,11 @@ export default function EventDetailPage() {
         throw new Error(errData.detail || "Este assento não está disponível.");
       }
 
-      setSelectedSeat(seat);
-      fetchSeats();
-    } catch (err: any) {
-      setError(err.message);
+      selectedSeatRef.current = seat.id;
+      setSelectedSeat({ ...seat, status: "HELD" });
+      await fetchSeats();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível reservar o assento.");
     }
   }
 

@@ -1,10 +1,22 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function NavBar() {
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    const publicPaths = ["/login", "/register"];
+
+    if (!loading && !user && !publicPaths.includes(pathname)) {
+      router.replace("/login");
+    }
+  }, [loading, user, pathname, router]);
 
   const roleBadgeStyles: Record<string, string> = {
     ORGANIZER: "bg-purple-100 text-purple-900 border-purple-300",
@@ -32,12 +44,14 @@ export default function NavBar() {
 
         {/* Links de Navegação por Papel */}
         <nav className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm font-medium text-stone-700">
-          <Link 
-            href="/" 
-            className="hover:text-amber-950 transition-colors"
-          >
-            Sessões
-          </Link>
+          {user?.role !== "ORGANIZER" && (
+            <Link
+              href="/"
+              className="hover:text-amber-950 transition-colors"
+            >
+              Sessões
+            </Link>
+          )}
 
           {user?.role === "CLIENT" && (
             <Link 
@@ -55,6 +69,12 @@ export default function NavBar() {
                 className="hover:text-amber-950 transition-colors"
               >
                 Catálogo TMDb
+              </Link>
+              <Link
+                href="/catalog/events"
+                className="hover:text-amber-950 transition-colors"
+              >
+                Eventos
               </Link>
               <Link 
                 href="/scanner" 

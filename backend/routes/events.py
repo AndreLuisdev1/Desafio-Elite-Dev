@@ -2,7 +2,7 @@ from typing import List
 from db import execute_query, fetch_all, fetch_one
 from dependencies import require_role
 from fastapi import APIRouter, Depends, HTTPException, status
-from schemas import EventCreate, EventResponse
+from schemas import EventCreate, EventResponse, EventUpdate
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -60,7 +60,7 @@ async def create_event(
         )
 
 
-# 2. Listar todos os eventos - PÚBLICO / CLIENTE
+# 2. Listar todos os eventos
 @router.get("", response_model=List[EventResponse], status_code=status.HTTP_200_OK)
 async def list_events():
     query = """
@@ -77,6 +77,75 @@ async def list_events():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao buscar lista de eventos: {str(e)}",
+        )
+
+
+# Atualizar qualquer evento por um organizador autenticado
+@router.put("/{event_id}", response_model=EventResponse, status_code=status.HTTP_200_OK)
+async def update_event(
+    event_id: int,
+    event: EventUpdate,
+    current_user: dict = Depends(require_role(["ORGANIZER"])),
+):
+    query = """
+        UPDATE events
+        SET title = %s, description = %s, date = %s, location = %s,
+            price = %s, poster_url = %s
+        WHERE id = %s
+    """
+    try:
+        await execute_query(
+            query,
+            (
+                event.title,
+                event.description,
+                event.date,
+                event.location,
+                event.price,
+                event.poster_url,
+                event_id,
+            ),
+        )
+        updated_event = await fetch_one(
+            """
+            SELECT e.id, e.title, e.description, e.date, e.location, e.price, e.capacity,
+                   e.tmdb_id, e.poster_url, e.organizer_id, e.created_at,
+                   u.name as organizer_name
+            FROM events e JOIN users u ON e.organizer_id = u.id
+            WHERE e.id = %s
+            """,
+            (event_id,),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Erro ao atualizar evento: {str(e)}",
+        )
+
+    if not updated_event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evento não encontrado")
+    return updated_event
+
+
+# Excluir qualquer evento por um organizador autenticado
+@router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_event(
+    event_id: int,
+    current_user: dict = Depends(require_role(["ORGANIZER"])),
+):
+    event = await fetch_one(
+        "SELECT id FROM events WHERE id = %s",
+        (event_id,),
+    )
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evento não encontrado")
+
+    try:
+        await execute_query("DELETE FROM events WHERE id = %s", (event_id,))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Erro ao excluir evento: {str(e)}",
         )
 
 

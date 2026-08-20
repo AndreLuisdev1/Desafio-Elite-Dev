@@ -1,337 +1,143 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
+import { EventItem } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-export default function CreateEventPage() {
+type EventForm = {
+  title: string;
+  description: string;
+  date: string;
+  location: string;
+  price: string;
+  poster_url: string;
+};
+
+const emptyForm: EventForm = { title: "", description: "", date: "", location: "", price: "", poster_url: "" };
+
+function toInputDate(value: string) {
+  return new Date(value).toISOString().slice(0, 16);
+}
+
+async function getResponseMessage(response: Response, fallback: string) {
+  const text = await response.text();
+  if (!text) return fallback;
+  try {
+    return JSON.parse(text).detail || fallback;
+  } catch {
+    return text;
+  }
+}
+
+export default function OrganizerEventsPage() {
   const { user, token, loading: authLoading } = useAuth();
   const router = useRouter();
-
-  // Campos do formulário (compatíveis com EventCreate do FastAPI)
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [date, setDate] = useState("");
-  const [location, setLocation] = useState("Sala IMAX 01 - Cinema Boulevard");
-  const [price, setPrice] = useState("35.00");
-  const [capacity, setCapacity] = useState("50");
-  const [posterUrl, setPosterUrl] = useState("");
-  const [tmdbId, setTmdbId] = useState<string>("");
-
-  const [loading, setLoading] = useState(false);
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
+  const [form, setForm] = useState<EventForm>(emptyForm);
+  const [saving, setSaving] = useState(false);
 
-  // Proteção da rota para Organizadores
   useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        router.push("/login");
-      } else if (user.role !== "ORGANIZER") {
-        router.push("/");
+    if (!authLoading && (!user || user.role !== "ORGANIZER")) {
+      router.push(user ? "/" : "/login");
+    }
+  }, [authLoading, user, router]);
+
+  useEffect(() => {
+    if (!token || user?.role !== "ORGANIZER") return;
+    async function loadEvents() {
+      setLoading(true);
+      try {
+        const response = await fetch(`${API_URL}/events`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!response.ok) throw new Error(await getResponseMessage(response, "Não foi possível carregar os eventos."));
+        setEvents(await response.json());
+        setError(null);
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : "Erro ao carregar eventos.");
+      } finally {
+        setLoading(false);
       }
     }
-  }, [user, authLoading, router]);
+    void loadEvents();
+  }, [token, user]);
 
-  // Define uma data padrão (amanhã às 20:00)
-  useEffect(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(20, 0, 0, 0);
-    setDate(tomorrow.toISOString().slice(0, 16));
-  }, []);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function openEditor(event: EventItem) {
+    setEditingEvent(event);
+    setForm({ title: event.title, description: event.description || "", date: toInputDate(event.date), location: event.location, price: String(event.price), poster_url: event.poster_url || "" });
     setError(null);
-    setLoading(true);
+  }
 
+  async function handleSave(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingEvent || !token) return;
+    setSaving(true);
+    setError(null);
     try {
-      const payload = {
-        title: title.trim(),
-        description: description.trim(),
-        date: new Date(date).toISOString(),
-        location: location.trim(),
-        price: parseFloat(price),
-        capacity: parseInt(capacity, 10),
-        poster_url: posterUrl.trim() || undefined,
-        tmdb_id: tmdbId ? parseInt(tmdbId, 10) : undefined,
-      };
-
-      const res = await fetch(`${API_URL}/events`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
+      const response = await fetch(`${API_URL}/events/${editingEvent.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: form.title.trim(), description: form.description.trim() || null, date: new Date(form.date).toISOString(), location: form.location.trim(), price: Number(form.price), poster_url: form.poster_url.trim() || null }),
       });
-
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.detail || "Erro ao cadastrar evento no banco de dados.");
-      }
-
-      const data = await res.json();
-      setSuccess(true);
-
-      setTimeout(() => {
-        router.push(`/events/${data.event_id || ""}`);
-      }, 1500);
-    } catch (err: any) {
-      setError(err.message);
-      setLoading(false);
+      if (!response.ok) throw new Error(await getResponseMessage(response, "Não foi possível atualizar o evento."));
+      const updatedEvent: EventItem = await response.json();
+      setEvents((current) => current.map((item) => item.id === updatedEvent.id ? updatedEvent : item));
+      setEditingEvent(null);
+      setNotice("Evento atualizado com sucesso.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Erro ao atualizar evento.");
+    } finally {
+      setSaving(false);
     }
   }
 
-  function formatPreviewDate(val: string) {
-    if (!val) return "Data não informada";
-    const d = new Date(val);
-    if (isNaN(d.getTime())) return "Data inválida";
-    return d.toLocaleDateString("pt-BR", {
-      weekday: "short",
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  async function handleDelete(event: EventItem) {
+    if (!token || !window.confirm(`Excluir o evento "${event.title}"? Essa ação não pode ser desfeita.`)) return;
+    setError(null);
+    try {
+      const response = await fetch(`${API_URL}/events/${event.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (!response.ok) throw new Error(await getResponseMessage(response, "Não foi possível excluir o evento."));
+      setEvents((current) => current.filter((item) => item.id !== event.id));
+      setNotice("Evento excluído com sucesso.");
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Erro ao excluir evento.");
+    }
   }
 
-  if (authLoading || (!user && !authLoading)) {
-    return (
-      <div className="min-h-[calc(100vh-70px)] flex items-center justify-center text-xs text-stone-500">
-        Verificando permissões de organizador...
-      </div>
-    );
+  function formatDate(value: string) {
+    return new Date(value).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
+
+  if (authLoading || !user || user.role !== "ORGANIZER") {
+    return <div className="min-h-[calc(100vh-70px)] flex items-center justify-center text-xs text-stone-500">Verificando permissões...</div>;
   }
 
   return (
-    <main className="max-w-7xl mx-auto px-6 sm:px-10 py-10">
-      {/* Cabeçalho */}
-      <section className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#FAF7F2] border border-[#E5DDD0] rounded-3xl p-8 shadow-xs">
-        <div>
-          <span className="text-[11px] font-bold tracking-widest text-purple-900 uppercase bg-purple-100 border border-purple-300 px-3 py-1 rounded-full">
-            Painel do Organizador
-          </span>
-          <h1 className="text-3xl font-extrabold text-stone-900 tracking-tight mt-3">
-            Cadastrar Nova Sessão
-          </h1>
-          <p className="text-xs text-stone-600 mt-1">
-            Preencha os detalhes da exibição. O backend gerará as poltronas automaticamente no banco.
-          </p>
+    <main className="max-w-6xl mx-auto px-6 sm:px-10 py-10">
+      <section className="rounded-3xl bg-stone-950 px-7 py-8 text-stone-50 shadow-xl sm:px-10 sm:py-10">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+          <div><span className="inline-flex rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-amber-200">Gestão de eventos</span><h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">Eventos publicados</h1><p className="mt-2 max-w-xl text-sm leading-6 text-stone-300">Edite os dados da sessão ou remova eventos que não estarão mais em cartaz.</p></div>
+          <button type="button" onClick={() => router.push("/catalog")} className="rounded-xl bg-amber-400 px-4 py-3 text-xs font-bold text-stone-950 transition hover:bg-amber-300">Criar nova sessão</button>
         </div>
-
-        <Link
-          href="/catalog"
-          className="bg-white hover:bg-stone-50 border border-[#D5CBB9] text-stone-800 text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-2xs"
-        >
-          🔍 Importar do Catálogo TMDb
-        </Link>
       </section>
 
-      {/* Alertas */}
-      {error && (
-        <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-2xl mb-6 text-xs font-medium">
-          ⚠️ {error}
+      {notice && <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-medium text-emerald-800">{notice}</div>}
+      {error && <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-800">{error}</div>}
+
+      {loading ? <div className="mt-8 rounded-2xl border border-[#E5DDD0] bg-[#FAF7F2] px-6 py-16 text-center text-xs text-stone-500">Carregando eventos...</div> : events.length === 0 ? (
+        <div className="mt-8 rounded-2xl border border-dashed border-[#CDBEAA] bg-[#FAF7F2] px-6 py-16 text-center"><h2 className="text-lg font-bold text-stone-900">Nenhum evento criado</h2><p className="mt-1 text-sm text-stone-500">Escolha um filme no catálogo para publicar uma nova sessão.</p><button type="button" onClick={() => router.push("/catalog")} className="mt-5 rounded-xl bg-stone-900 px-5 py-3 text-xs font-bold text-white">Ir para o catálogo</button></div>
+      ) : (
+        <div className="mt-8 grid gap-5 md:grid-cols-2">
+          {events.map((event) => <article key={event.id} className="overflow-hidden rounded-2xl border border-[#E5DDD0] bg-[#FAF7F2] shadow-sm"><div className="flex gap-4 p-5">{event.poster_url ? <img src={event.poster_url} alt={event.title} className="h-28 w-20 shrink-0 rounded-xl object-cover" /> : <div className="h-28 w-20 shrink-0 rounded-xl bg-[#E5DDD0]" />}<div className="min-w-0 flex-1"><p className="text-[10px] font-bold uppercase tracking-widest text-amber-900">Sessão publicada</p><h2 className="mt-1 truncate text-lg font-black text-stone-900">{event.title}</h2><p className="mt-2 text-xs text-stone-600">{formatDate(event.date)}</p><p className="text-xs text-stone-600">{event.location}</p></div></div><div className="grid grid-cols-3 border-t border-[#E5DDD0] text-xs text-stone-600"><div className="px-5 py-3"><span className="block text-[10px] uppercase text-stone-400">Valor</span><strong className="text-stone-900">R$ {Number(event.price).toFixed(2)}</strong></div><div className="border-x border-[#E5DDD0] px-5 py-3"><span className="block text-[10px] uppercase text-stone-400">Capacidade</span><strong className="text-stone-900">{event.capacity}</strong></div><div className="px-5 py-3"><span className="block text-[10px] uppercase text-stone-400">Código</span><strong className="text-stone-900">#{event.id}</strong></div></div><div className="flex gap-2 border-t border-[#E5DDD0] p-4"><button type="button" onClick={() => openEditor(event)} className="flex-1 rounded-xl border border-[#D5CBB9] bg-white py-2.5 text-xs font-bold text-stone-800 transition hover:bg-stone-100">Editar evento</button><button type="button" onClick={() => handleDelete(event)} className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-800 transition hover:bg-rose-100">Apagar</button></div></article>)}
         </div>
       )}
 
-      {success && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 px-4 py-3 rounded-2xl mb-6 text-xs font-medium">
-          ✅ Sessão criada com sucesso! Redirecionando para o mapa de assentos...
-        </div>
-      )}
-
-      {/* Grid: Formulário + Preview */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Formulário */}
-        <div className="lg:col-span-7 bg-[#FAF7F2] border border-[#E5DDD0] rounded-3xl p-6 sm:p-8 shadow-xs">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-stone-700 mb-1">
-                Título do Filme / Evento *
-              </label>
-              <input
-                type="text"
-                required
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex: Oppenheimer"
-                className="w-full bg-white border border-[#D5CBB9] rounded-xl px-3.5 py-2.5 text-xs text-stone-900 focus:outline-none focus:border-amber-900 focus:ring-1 focus:ring-amber-900"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-stone-700 mb-1">
-                Sinopse / Descrição *
-              </label>
-              <textarea
-                rows={4}
-                required
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Sinopse detalhada da exibição..."
-                className="w-full bg-white border border-[#D5CBB9] rounded-xl px-3.5 py-2.5 text-xs text-stone-900 focus:outline-none focus:border-amber-900 focus:ring-1 focus:ring-amber-900"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Data e Horário *
-                </label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full bg-white border border-[#D5CBB9] rounded-xl px-3.5 py-2.5 text-xs text-stone-900 focus:outline-none focus:border-amber-900 focus:ring-1 focus:ring-amber-900"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Local / Sala *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Ex: Sala IMAX 01"
-                  className="w-full bg-white border border-[#D5CBB9] rounded-xl px-3.5 py-2.5 text-xs text-stone-900 focus:outline-none focus:border-amber-900 focus:ring-1 focus:ring-amber-900"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Preço do Ingresso (R$) *
-                </label>
-                <input
-                  type="number"
-                  step="0.50"
-                  min="1"
-                  required
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  className="w-full bg-white border border-[#D5CBB9] rounded-xl px-3.5 py-2.5 text-xs text-stone-900 focus:outline-none focus:border-amber-900 focus:ring-1 focus:ring-amber-900"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Capacidade Total *
-                </label>
-                <input
-                  type="number"
-                  min="10"
-                  max="200"
-                  required
-                  value={capacity}
-                  onChange={(e) => setCapacity(e.target.value)}
-                  className="w-full bg-white border border-[#D5CBB9] rounded-xl px-3.5 py-2.5 text-xs text-stone-900 focus:outline-none focus:border-amber-900 focus:ring-1 focus:ring-amber-900"
-                />
-                <p className="text-[10px] text-stone-400 mt-1">
-                  O backend distribuirá os assentos em fileiras (A até E).
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  URL da Imagem do Poster
-                </label>
-                <input
-                  type="url"
-                  value={posterUrl}
-                  onChange={(e) => setPosterUrl(e.target.value)}
-                  placeholder="https://image.tmdb.org/t/p/w500/..."
-                  className="w-full bg-white border border-[#D5CBB9] rounded-xl px-3.5 py-2.5 text-xs text-stone-900 focus:outline-none focus:border-amber-900 focus:ring-1 focus:ring-amber-900"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  ID TMDb (Opcional)
-                </label>
-                <input
-                  type="number"
-                  value={tmdbId}
-                  onChange={(e) => setTmdbId(e.target.value)}
-                  placeholder="Ex: 872585"
-                  className="w-full bg-white border border-[#D5CBB9] rounded-xl px-3.5 py-2.5 text-xs text-stone-900 focus:outline-none focus:border-amber-900 focus:ring-1 focus:ring-amber-900"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || success}
-              className="w-full mt-4 bg-stone-900 hover:bg-stone-800 text-stone-50 font-semibold text-xs py-3.5 rounded-xl transition shadow-xs disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {loading ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-stone-400 border-t-white rounded-full animate-spin" />
-                  <span>Registrando Sessão e Gerando Assentos...</span>
-                </>
-              ) : (
-                "Salvar e Publicar Sessão"
-              )}
-            </button>
-          </form>
-        </div>
-
-        {/* Pré-visualização do Card da Vitrine */}
-        <div className="lg:col-span-5 bg-[#FAF7F2] border border-[#E5DDD0] rounded-3xl p-6 shadow-xs sticky top-24">
-          <div className="mb-4">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500">
-              Pré-visualização do Card
-            </span>
-            <p className="text-xs text-stone-400">Assim os clientes verão sua sessão na Home:</p>
-          </div>
-
-          <article className="bg-white border border-[#E5DDD0] rounded-2xl overflow-hidden shadow-xs">
-            <div className="relative h-64 w-full bg-stone-200 overflow-hidden flex items-center justify-center">
-              {posterUrl ? (
-                <img
-                  src={posterUrl}
-                  alt={title || "Poster"}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = "none";
-                  }}
-                />
-              ) : (
-                <span className="text-xs text-stone-400 font-medium">Sem imagem de capa</span>
-              )}
-              <div className="absolute top-3 right-3 bg-stone-900/80 backdrop-blur-md text-stone-50 text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-700/50">
-                R$ {price ? parseFloat(price || "0").toFixed(2) : "0.00"}
-              </div>
-            </div>
-
-            <div className="p-5">
-              <h2 className="text-base font-bold text-stone-900 truncate">
-                {title || "Título da Sessão"}
-              </h2>
-              <p className="text-xs text-stone-500 mt-1 line-clamp-2 leading-relaxed">
-                {description || "A sinopse do filme aparecerá aqui para os espectadores."}
-              </p>
-
-              <div className="mt-4 pt-4 border-t border-stone-100 space-y-1.5 text-xs text-stone-700">
-                <p>🗓️ <strong>Data:</strong> {formatPreviewDate(date)}</p>
-                <p>📍 <strong>Local:</strong> {location || "Não especificado"}</p>
-                <p>💺 <strong>Capacidade:</strong> {capacity || 50} poltronas</p>
-              </div>
-            </div>
-          </article>
-        </div>
-      </div>
+      {editingEvent && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-stone-950/70 p-4 backdrop-blur-sm"><form onSubmit={handleSave} className="w-full max-w-2xl rounded-3xl border border-[#E5DDD0] bg-[#FAF7F2] p-6 shadow-2xl sm:p-8"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-widest text-amber-900">Editar sessão</p><h2 className="mt-2 text-2xl font-black text-stone-900">{editingEvent.title}</h2></div><button type="button" onClick={() => setEditingEvent(null)} className="h-9 w-9 rounded-full border border-[#D5CBB9] bg-white text-lg font-bold text-stone-500">×</button></div><div className="mt-6 grid gap-4 sm:grid-cols-2"><label className="sm:col-span-2 text-xs font-bold text-stone-700">Título<input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="mt-1.5 w-full rounded-xl border border-[#D5CBB9] bg-white px-3.5 py-3 text-sm font-normal text-stone-900 outline-none focus:border-amber-900" /></label><label className="text-xs font-bold text-stone-700">Data e horário<input required type="datetime-local" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="mt-1.5 w-full rounded-xl border border-[#D5CBB9] bg-white px-3.5 py-3 text-sm font-normal text-stone-900 outline-none focus:border-amber-900" /></label><label className="text-xs font-bold text-stone-700">Preço<input required min="0.01" step="0.01" type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="mt-1.5 w-full rounded-xl border border-[#D5CBB9] bg-white px-3.5 py-3 text-sm font-normal text-stone-900 outline-none focus:border-amber-900" /></label><label className="sm:col-span-2 text-xs font-bold text-stone-700">Local ou sala<input required value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className="mt-1.5 w-full rounded-xl border border-[#D5CBB9] bg-white px-3.5 py-3 text-sm font-normal text-stone-900 outline-none focus:border-amber-900" /></label><label className="sm:col-span-2 text-xs font-bold text-stone-700">Descrição<textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="mt-1.5 w-full resize-none rounded-xl border border-[#D5CBB9] bg-white px-3.5 py-3 text-sm font-normal text-stone-900 outline-none focus:border-amber-900" /></label><label className="sm:col-span-2 text-xs font-bold text-stone-700">URL do cartaz<input value={form.poster_url} onChange={(e) => setForm({ ...form, poster_url: e.target.value })} className="mt-1.5 w-full rounded-xl border border-[#D5CBB9] bg-white px-3.5 py-3 text-sm font-normal text-stone-900 outline-none focus:border-amber-900" /></label></div><div className="mt-6 flex justify-end gap-3 border-t border-[#E5DDD0] pt-5"><button type="button" onClick={() => setEditingEvent(null)} className="rounded-xl bg-[#E5DDD0] px-5 py-3 text-xs font-bold text-stone-800">Cancelar</button><button type="submit" disabled={saving} className="rounded-xl bg-stone-950 px-6 py-3 text-xs font-bold text-white disabled:opacity-50">{saving ? "Salvando..." : "Salvar alterações"}</button></div></form></div>}
     </main>
   );
 }
