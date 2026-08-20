@@ -13,6 +13,12 @@ interface CreateEventModalProps {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+function getMinimumDateTime() {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  return now.toISOString().slice(0, 16);
+}
+
 export default function CreateEventModal({
   isOpen,
   onClose,
@@ -22,7 +28,7 @@ export default function CreateEventModal({
   const { token } = useAuth();
 
   const [date, setDate] = useState("");
-  const [location, setLocation] = useState("Sala IMAX 01 - Cinema Boulevard");
+  const [location, setLocation] = useState("Cinemark - São José dos Campos");
   const [price, setPrice] = useState("35.00");
   const [capacity, setCapacity] = useState("50");
   const [loading, setLoading] = useState(false);
@@ -60,12 +66,16 @@ export default function CreateEventModal({
         throw new Error("Informe uma data e horário válidos.");
       }
 
+      if (eventDate <= new Date()) {
+        throw new Error("A sessão deve ser agendada para uma data e horário futuros.");
+      }
+
       if (!Number.isFinite(eventPrice) || eventPrice <= 0) {
         throw new Error("Informe um preço válido.");
       }
 
-      if (!Number.isInteger(eventCapacity) || eventCapacity <= 0) {
-        throw new Error("Informe uma capacidade válida.");
+      if (!Number.isInteger(eventCapacity) || eventCapacity <= 0 || eventCapacity > 50) {
+        throw new Error("A capacidade deve estar entre 1 e 50 pessoas.");
       }
 
       const payload = {
@@ -163,6 +173,7 @@ export default function CreateEventModal({
               <input
                 type="datetime-local"
                 required
+                min={getMinimumDateTime()}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 className="w-full rounded-xl border border-[#D5CBB9] bg-white px-3.5 py-3 text-sm text-stone-900 outline-none focus:border-amber-900 focus:ring-2 focus:ring-amber-900/20"
@@ -175,7 +186,7 @@ export default function CreateEventModal({
                 required
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                placeholder="Ex: Sala IMAX 01 - Cinema Boulevard"
+                placeholder="Ex: Cinemark - São José dos Campos"
                 className="w-full rounded-xl border border-[#D5CBB9] bg-white px-3.5 py-3 text-sm text-stone-900 outline-none focus:border-amber-900 focus:ring-2 focus:ring-amber-900/20"
               />
             </div>
@@ -198,7 +209,7 @@ export default function CreateEventModal({
               <input
                 type="number"
                 min="10"
-                max="200"
+                max="50"
                 required
                 value={capacity}
                 onChange={(e) => setCapacity(e.target.value)}

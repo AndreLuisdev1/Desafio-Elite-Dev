@@ -20,6 +20,12 @@ export default function EventDetailPage() {
   const [loadingEvent, setLoadingEvent] = useState(true);
   const [loadingSeats, setLoadingSeats] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"CARD" | "PIX">("CARD");
+  const [cardNumber, setCardNumber] = useState("");
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [pixCopied, setPixCopied] = useState(false);
+  const pixCode = "00020126580014BR.GOV.BCB.PIX0136simulacao-cineplex-2026-0000000000005204000053039865802BR5920CINEPLEX SIMULADO6009SAO PAULO62070503***6304FAKE";
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -146,7 +152,7 @@ export default function EventDetailPage() {
   }
 
   // Finaliza a compra
-  async function handleCheckout() {
+  function openPayment() {
     if (!user || !token) {
       router.push("/login");
       return;
@@ -157,8 +163,28 @@ export default function EventDetailPage() {
       return;
     }
 
+    setPaymentError(null);
+    setIsPaymentOpen(true);
+  }
+
+  async function handleCheckout() {
+    if (!selectedSeat || !event) return;
+
+    if (paymentMethod === "CARD" && cardNumber.replace(/\D/g, "").length < 16) {
+      setPaymentError("Informe um número de cartão válido com 16 dígitos.");
+      return;
+    }
+
     setProcessing(true);
-    setError(null);
+    setPaymentError(null);
+
+    await new Promise((resolve) => setTimeout(resolve, 900));
+
+    if (paymentMethod === "CARD" && cardNumber.replace(/\D/g, "").endsWith("0000")) {
+      setPaymentError("Pagamento recusado na simulação. Tente outro cartão.");
+      setProcessing(false);
+      return;
+    }
 
     try {
       const res = await fetch(`${API_URL}/tickets/checkout`, {
@@ -179,11 +205,12 @@ export default function EventDetailPage() {
       }
 
       setSuccessMessage("Ingresso garantido com sucesso! Redirecionando...");
+      setIsPaymentOpen(false);
       setTimeout(() => {
         router.push("/tickets");
       }, 1500);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setPaymentError(err instanceof Error ? err.message : "Erro ao processar pagamento.");
       setProcessing(false);
     }
   }
@@ -216,7 +243,7 @@ export default function EventDetailPage() {
         <p className="text-sm text-stone-700 font-medium">Sessão não encontrada.</p>
         <button
           onClick={() => router.push("/")}
-          className="mt-4 bg-stone-900 text-stone-50 text-xs px-4 py-2 rounded-xl"
+          className="mt-4 bg-stone-900 text-white text-xs px-4 py-2 rounded-xl"
         >
           Voltar à Vitrine
         </button>
@@ -386,14 +413,108 @@ export default function EventDetailPage() {
           </div>
 
           <button
-            onClick={handleCheckout}
+            onClick={openPayment}
             disabled={!selectedSeat || processing}
-            className="bg-stone-900 hover:bg-stone-800 text-stone-50 text-xs font-semibold px-6 py-3 rounded-xl transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+            className="bg-stone-900 hover:bg-stone-800 text-white text-xs font-semibold px-6 py-3 rounded-xl transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
           >
-            {processing ? "Confirmando..." : `Pagar R$ ${Number(event.price).toFixed(2)}`}
+            {processing ? "Processando..." : `Ir para pagamento`}
           </button>
         </div>
       </section>
+
+      {isPaymentOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 px-4 py-6 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-[#E5DDD0] bg-[#FAF7F2] p-6 shadow-2xl sm:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-900">Pagamento simulado</p>
+                <h2 className="mt-1 text-2xl font-black text-stone-900">Finalize seu ingresso</h2>
+                <p className="mt-1 text-xs text-stone-500">Poltrona {selectedSeat?.seat_number} · R$ {Number(event.price).toFixed(2)}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPaymentOpen(false)}
+                className="h-9 w-9 rounded-full border border-[#D5CBB9] bg-white text-lg leading-none text-stone-700 hover:bg-stone-100"
+                aria-label="Fechar pagamento"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 gap-2">
+              {(["CARD", "PIX"] as const).map((method) => (
+                <button
+                  key={method}
+                  type="button"
+                  onClick={() => { setPaymentMethod(method); setPaymentError(null); }}
+                  className={`rounded-xl border px-2 py-3 text-xs font-bold transition ${paymentMethod === method ? "border-amber-900 bg-amber-900 text-white" : "border-[#D5CBB9] bg-white text-stone-700 hover:border-amber-700"}`}
+                >
+                  {method === "CARD" ? "Cartão" : method === "PIX" ? "PIX" : "Boleto"}
+                </button>
+              ))}
+            </div>
+
+            {paymentMethod === "CARD" && (
+              <label className="mt-5 block text-xs font-bold text-stone-700">
+                Número do cartão
+                <input
+                  value={cardNumber}
+                  onChange={(event) => setCardNumber(event.target.value.replace(/[^\d\s]/g, ""))}
+                  inputMode="numeric"
+                  maxLength={19}
+                  placeholder="0000 0000 0000 0000"
+                  className="mt-2 w-full rounded-xl border-[#D5CBB9] bg-white px-4 py-3 text-sm font-normal text-stone-900 outline-none focus:border-amber-800 focus:ring-2 focus:ring-amber-800/20"
+                />
+              </label>
+            )}
+
+            {paymentMethod === "PIX" && (
+              <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-center text-xs text-amber-950">
+                <div
+                  className="mx-auto h-36 w-36 rounded-xl border-8 border-white bg-white shadow-sm"
+                  style={{
+                    backgroundImage: "repeating-linear-gradient(45deg, #292524 0 3px, transparent 3px 7px), repeating-linear-gradient(-45deg, #292524 0 2px, transparent 2px 6px)",
+                  }}
+                  aria-label="QR Code PIX fictício"
+                  role="img"
+                />
+                <p className="mt-3 font-bold">QR Code PIX fictício</p>
+                <p className="mt-1 text-[11px] text-amber-900/80">Esta é uma simulação. Nenhum pagamento real será realizado.</p>
+                <div className="mt-3 flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={pixCode}
+                    className="min-w-0 flex-1 rounded-lg border-amber-200 bg-white px-2 py-2 text-[10px] text-stone-600"
+                    aria-label="Código PIX fictício"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(pixCode);
+                      setPixCopied(true);
+                      setTimeout(() => setPixCopied(false), 2000);
+                    }}
+                    className="shrink-0 rounded-lg bg-amber-900 px-3 py-2 text-[10px] font-bold text-white hover:bg-amber-950"
+                  >
+                    {pixCopied ? "Copiado" : "Copiar"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {paymentError && <p className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-xs font-medium text-rose-800">{paymentError}</p>}
+
+            <button
+              type="button"
+              onClick={handleCheckout}
+              disabled={processing}
+              className="mt-6 w-full rounded-xl bg-stone-900 px-4 py-3 text-xs font-bold text-white transition hover:bg-stone-700 disabled:cursor-wait disabled:opacity-60"
+            >
+              {processing ? "Processando pagamento..." : `Confirmar pagamento · R$ ${Number(event.price).toFixed(2)}`}
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

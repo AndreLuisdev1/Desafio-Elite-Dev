@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 # -------------------------------------------------------------
@@ -51,12 +51,20 @@ class EventCreate(BaseModel):
     date: datetime
     location: str
     price: float = Field(gt=0)
-    capacity: int = Field(gt=0)
+    capacity: int = Field(gt=0, le=50)
     tmdb_id: Optional[int] = None
     poster_url: Optional[str] = None
     organizer_id: Optional[int] = (
         None  # Preenchido automaticamente via token JWT
     )
+
+    @field_validator("date")
+    @classmethod
+    def date_must_be_future(cls, value: datetime) -> datetime:
+        reference = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        if reference <= datetime.now(timezone.utc):
+            raise ValueError("A sessão deve ser agendada para uma data e horário futuros.")
+        return value
 
 
 class EventUpdate(BaseModel):
@@ -66,6 +74,14 @@ class EventUpdate(BaseModel):
     location: str
     price: float = Field(gt=0)
     poster_url: Optional[str] = None
+
+    @field_validator("date")
+    @classmethod
+    def date_must_be_future(cls, value: datetime) -> datetime:
+        reference = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        if reference <= datetime.now(timezone.utc):
+            raise ValueError("A sessão deve ser agendada para uma data e horário futuros.")
+        return value
 
 
 class EventResponse(BaseModel):

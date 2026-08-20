@@ -163,7 +163,7 @@ export default function HomePage() {
                 {/* Botão de Redirecionamento para a Seleção de Assentos */}
                 <Link
                   href={`/events/${event.id}`}
-                  className="mt-6 w-full text-center bg-amber-900 hover:bg-amber-950 text-amber-50 text-xs font-semibold py-3 rounded-xl transition duration-150 shadow-xs block"
+                  className="mt-6 w-full text-center bg-amber-900 hover:bg-amber-950 text-white text-xs font-semibold py-3 rounded-xl transition duration-150 shadow-xs block"
                 >
                   Selecionar Assentos
                 </Link>
